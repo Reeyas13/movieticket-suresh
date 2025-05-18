@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = "mysql://root:@localhost:3306/movieticket"
+}
+
+// User model for authentication and user management
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  name           String
+  password       String
+  phone          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tickets        Ticket[]
+  payments       Payment[]
+  role            Roles     @default(USER)
+  filmhall        FilmHall?
+  @@map("users")
+}
+
+// FilmHall represents a cinema complex
+model FilmHall {
+  id          Int       @id @default(autoincrement())
+  name        String
+  address     String
+  city        String
+  description String?
+  imageUrl    String?
+  halls       Hall[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  userId      Int      @unique
+  user          User      @relation(fields: [userId], references: [id])
+  @@map("film_halls")
+}
+
+// Hall represents a single cinema hall inside a film hall
+model Hall {
+  id         Int       @id @default(autoincrement())
+  name       String
+  capacity   Int
+  filmHallId Int
+  filmHall   FilmHall  @relation(fields: [filmHallId], references: [id], onDelete: Cascade)
+  seats      Seat[]
+  showTimes  ShowTime[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("halls")
+}
+
+// Seat type for different pricing categories
+model SeatType {
+  id           Int               @id @default(autoincrement())
+  name         String            // e.g., Standard, Premium, VIP
+  description  String?
+  seats        Seat[]
+  pricingOptions ShowTimePricing[] // Added this field to fix the relation error
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@map("seat_types")
+}
+
+// Seat represents a single seat in a hall
+model Seat {
+  id         Int       @id @default(autoincrement())
+  row        String    // e.g., A, B, C
+  number     Int       // e.g., 1, 2, 3
+  seatTypeId Int?
+  seatType   SeatType?  @relation(fields: [seatTypeId], references: [id])
+  hallId     Int
+  hall       Hall      @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  tickets    Ticket[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([hallId, row, number])
+  @@map("seats")
+}
+
+// Movie model for films being shown
+model Movie {
+  id           Int        @id @default(autoincrement())
+  title        String
+  description  String     @db.Text
+  duration     Int        // duration in minutes
+  genre        String
+  releaseDate  DateTime
+  language     String
+  director     String?
+  cast         String?
+  posterUrl    String?
+  trailerUrl   String?
+  showTimes    ShowTime[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("movies")
+}
+
+// Price configuration for different seat types in a showtime
+model ShowTimePricing {
+  id         Int       @id @default(autoincrement())
+  showTimeId Int
+  showTime   ShowTime  @relation(fields: [showTimeId], references: [id], onDelete: Cascade)
+  seatTypeId Int
+  seatType   SeatType  @relation(fields: [seatTypeId], references: [id])
+  price      Decimal   @db.Decimal(10, 2)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([showTimeId, seatTypeId])
+  @@map("showtime_pricing")
+}
+
+// ShowTime represents when a movie is shown in a specific hall
+model ShowTime {
+  id              Int              @id @default(autoincrement())
+  startTime       DateTime
+  endTime         DateTime
+  movieId         Int
+  movie           Movie            @relation(fields: [movieId], references: [id])
+  hallId          Int
+  hall            Hall             @relation(fields: [hallId], references: [id])
+  basePrice       Decimal          @db.Decimal(10, 2)
+  pricingOptions  ShowTimePricing[]
+  tickets         Ticket[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("show_times")
+}
+
+// Ticket model for purchased tickets
+model Ticket {
+  id         Int       @id @default(autoincrement())
+  showTimeId Int
+  showTime   ShowTime  @relation(fields: [showTimeId], references: [id])
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id])
+  seatId     Int
+  seat       Seat      @relation(fields: [seatId], references: [id])
+  price      Decimal   @db.Decimal(10, 2)  // Store the actual price paid
+  paymentId  Int
+  payment    Payment   @relation(fields: [paymentId], references: [id])
+  qrCode     String?   // for ticket validation
+  isUsed     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([showTimeId, seatId])
+  @@map("tickets")
+}
+
+// Payment for tickets
+model Payment {
+  id             Int       @id @default(autoincrement())
+  amount         Decimal   @db.Decimal(10, 2)
+  status         PaymentStatus @default(PENDING)
+  paymentMethod  PaymentMethod
+  transactionId  String?   // reference to external payment system
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id])
+  tickets        Ticket[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("payments")
+}
+
+// Payment status enum
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Payment method enum
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  BANK_TRANSFER
+  CASH
+}
+enum Roles{
+  USER
+  ADMIN
+  CINEMA
+}
