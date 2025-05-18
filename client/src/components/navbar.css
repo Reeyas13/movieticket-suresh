@@ -1,0 +1,20 @@
+@media (min-width: 768px) {
+  .desktop-nav {
+    display: flex !important;
+  }
+  
+  .desktop-auth {
+    display: flex !important;
+  }
+  
+  .mobile-menu-button {
+    display: none !important;
+  }
+}
+
+/* Mobile menu button styles */
+@media (max-width: 767px) {
+  .mobile-menu-button {
+    display: block !important;
+  }
+}
