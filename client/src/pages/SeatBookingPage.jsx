@@ -50,9 +50,10 @@ const SeatBookingPage = () => {
     const processedSeats = seatsData.map(seat => {
       return {
         id: seat.id.toString(),
-        row: seat.row,
+        row: seat.row,  // Keep original row for backend reference
+        displayRow: convertToNumeric(seat.row), // Convert row to numeric for display
         number: seat.number,
-        type: seat.seatType.name === 'r' ? 'regular' : 'special',
+        type: seat.seatType ? (seat.seatType.name === 'r' ? 'regular' : 'special') : 'regular',
         status: seat.tickets && seat.tickets.length > 0 ? 'booked' : 'available',
         price: getPrice(seat.seatTypeId),
         seatTypeId: seat.seatTypeId
@@ -74,7 +75,26 @@ const SeatBookingPage = () => {
       return acc;
     }, {});
     
-    setSeatsByRow(groupedByRow);
+    // Convert keys to numeric rows for display and sort them
+    const sortedRows = Object.keys(groupedByRow).sort((a, b) => {
+      return convertToNumeric(a) - convertToNumeric(b);
+    });
+    
+    const sortedGroupedByRow = {};
+    sortedRows.forEach(row => {
+      sortedGroupedByRow[row] = groupedByRow[row];
+    });
+    
+    setSeatsByRow(sortedGroupedByRow);
+  };
+
+  // Convert alphabetic row (e.g., 'A', 'B') to numeric (1, 2)
+  const convertToNumeric = (row) => {
+    if (!row) return 1;
+    if (!isNaN(row)) return Number(row); // If already numeric
+    
+    // If alphabetic, convert to numeric (A=1, B=2, etc.)
+    return row.toUpperCase().charCodeAt(0) - 64;
   };
 
   // Get price based on seat type from pricing options
@@ -131,20 +151,87 @@ const SeatBookingPage = () => {
     }
   }, [seats]);
 
-  const handleProceedToPayment = useCallback(() => {
+  const handleProceedToPayment = useCallback(async () => {
     if (selectedSeats.length === 0) return;
 
-    // Navigate to payment page with real data
-    navigate('/payment', { 
-      state: { 
-        movie,
-        showtime,
-        hall,
-        selectedSeats: selectedSeats.map(id => seats.find(s => s.id === id)),
-        totalPrice
-      } 
-    });
-  }, [navigate, selectedSeats, movie, showtime, hall, seats, totalPrice]);
+    try {
+      // Set static user ID as 1 for this implementation
+      const userId = 1;
+      
+      // First create the booking in the database
+      const bookingData = {
+        userId: userId,
+        showtimeId: showtime.id,
+        seats: selectedSeats,
+        paymentMethod: 'ESEWA' // Using eSewa as payment method
+      };
+      
+      // Create booking and get payment details
+      const response = await api.post('api/frontend/bookings', bookingData);
+      const { payment, tickets } = response.data;
+      
+      // Prepare eSewa parameters
+      const esewaParams = {
+        amt: totalPrice, // Amount
+        psc: 0, // Service charge
+        pdc: 0, // Delivery charge
+        txAmt: 0, // Tax amount
+        tAmt: totalPrice, // Total amount
+        pid: payment.id, // Payment ID
+        scd: 'EPAYTEST', // Merchant code (test)
+        su: `${window.location.origin}/booking-success`, // Success URL
+        fu: `${window.location.origin}/booking-failed` // Failure URL
+      };
+      
+      // Create a form to submit to eSewa
+      const form = document.createElement('form');
+      form.setAttribute('method', 'POST');
+      form.setAttribute('action', 'https://uat.esewa.com.np/epay/main');
+      form.setAttribute('target', '_blank');
+      
+      // Add parameters to the form
+      for (const key in esewaParams) {
+        const hiddenField = document.createElement('input');
+        hiddenField.setAttribute('type', 'hidden');
+        hiddenField.setAttribute('name', key);
+        hiddenField.setAttribute('value', esewaParams[key]);
+        form.appendChild(hiddenField);
+      }
+      
+      // Append the form to the body and submit it
+      document.body.appendChild(form);
+      
+      // For demo purposes, we'll simulate a successful payment without submitting the form
+      // In a real application, you would uncomment the next line to submit the form
+      // form.submit();
+      
+      // Simulate a successful payment and update payment status
+      try {
+        await api.post(`api/frontend/payments/${payment.id}/complete`, { transactionId: `ESEWA-${Date.now()}` });
+      } catch (error) {
+        console.error('Error updating payment status:', error);
+      }
+      
+      document.body.removeChild(form);
+      
+      alert(`Payment successful! Total: Rs. ${totalPrice.toFixed(2)}\nTicket IDs: ${tickets.map(t => t.id).join(', ')}`);
+      
+      // Navigate to a booking success page
+      navigate('/booking-success', { 
+        state: { 
+          movie,
+          showtime,
+          tickets,
+          payment,
+          selectedSeats: selectedSeats.map(id => seats.find(s => s.id === id)),
+          totalPrice
+        } 
+      });
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Payment failed. Please try again.');
+    }
+  }, [navigate, selectedSeats, movie, showtime, seats, totalPrice]);
 
   const handleBackToMovie = () => {
     navigate(`/movie/${movie?.id}`);
@@ -432,7 +519,7 @@ const SeatBookingPage = () => {
                   textAlign: 'center', 
                   fontWeight: '500', 
                   color: '#6B7280' 
-                }}>{row}</div>
+                }}>{rowSeats[0]?.displayRow || convertToNumeric(row)}</div>
                 
                 <div style={{ 
                   display: 'flex', 

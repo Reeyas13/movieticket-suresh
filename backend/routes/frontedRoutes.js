@@ -36,6 +36,7 @@ frontedRoutes.get("/users/:id", frontendController.getUserProfile);
 
 // Post routes
 frontedRoutes.post("/bookings", frontendController.createBooking);
+frontedRoutes.post("/payments/:id/complete", frontendController.completePayment);
 frontedRoutes.put("/users/:id", frontendController.updateUserProfile);
 
 // export default frontedRoutes;

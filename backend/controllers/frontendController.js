@@ -63,31 +63,10 @@ const getMovie = async (req, res) => {
       include: {
         hall: {
           include: {
-            filmHall: true,    // Include FilmHall details
-            seats: {          // Include all seats in the hall
-              include: {
-                  seatType: true // Include seat type for each seat
-              }
-            }
+            filmHall: true
           }
         },
-        pricingOptions: {      // Include pricing for different seat types
-          include: {
-            seatType: true
-          }
-        },
-        tickets: {            // Include all tickets for this showtime
-          include: {
-            seat: {           // Include seat details for each ticket
-              include: {
-                seatType: true
-              }
-            },
-            user: true,       // Include user who bought the ticket
-            payment: true     // Include payment details
-          }
-        },
-        // movie: true           // Include movie details again (redundant but safe)
+        tickets: true
       }
     }
   }
@@ -377,9 +356,11 @@ const getAvailableSeats = async (req, res) => {
 };
 
 // Booking and Payment APIs
- const createBooking = async (req, res) => {
+const createBooking = async (req, res) => {
   try {
     const { userId, showtimeId, seats, paymentMethod } = req.body;
+    
+    console.log('Booking request received:', { userId, showtimeId, seats, paymentMethod });
     
     if (!userId || !showtimeId || !seats || !seats.length || !paymentMethod) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -389,11 +370,9 @@ const getAvailableSeats = async (req, res) => {
     const showtime = await prisma.showTime.findUnique({
       where: { id: Number(showtimeId) },
       include: {
-        pricingOptions: {
-          include: {
-            seatType: true
-          }
-        }
+        pricingOptions: true,
+        movie: true,
+        hall: true
       }
     });
     
@@ -401,7 +380,9 @@ const getAvailableSeats = async (req, res) => {
       return res.status(404).json({ message: 'Showtime not found' });
     }
     
-    // Get seat information for the selected seats
+    console.log('Found showtime:', showtime.id);
+    
+    // Get seat information for the selected seats with their types and hall info
     const selectedSeats = await prisma.seat.findMany({
       where: {
         id: {
@@ -409,9 +390,16 @@ const getAvailableSeats = async (req, res) => {
         }
       },
       include: {
-        seatType: true
+        hall: true
       }
     });
+    
+    console.log('Selected seats found:', selectedSeats.length);
+    
+    if (selectedSeats.length !== seats.length) {
+      console.error('Not all seats were found in the database');
+      return res.status(400).json({ message: 'One or more selected seats are invalid' });
+    }
     
     // Check if any of the selected seats are already booked
     const existingBookings = await prisma.ticket.findMany({
@@ -430,53 +418,52 @@ const getAvailableSeats = async (req, res) => {
       });
     }
     
-    // Calculate total price
-    let totalAmount = 0;
+    // Calculate total price using base price since we're not using seat types
+    const totalAmount = selectedSeats.length * parseFloat(showtime.basePrice);
+    console.log('Base price per seat:', showtime.basePrice);
+    console.log('Number of seats:', selectedSeats.length);
     
-    selectedSeats.forEach(seat => {
-      // Find pricing for this seat type
-      const pricingOption = showtime.pricingOptions.find(
-        option => option.seatTypeId === seat.seatTypeId
-      );
-      
-      // Use pricing option price or base price if not found
-      const price = pricingOption ? parseFloat(pricingOption.price) : parseFloat(showtime.basePrice);
-      totalAmount += price;
-    });
+    console.log('Total amount calculated:', totalAmount);
+    
+    // Map payment method to enum value
+    // Available options in enum: CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER, CASH
+    let paymentMethodEnum = 'CREDIT_CARD'; // Default
+    
+    if (paymentMethod === 'ESEWA') {
+      // Map ESEWA to one of the available enum values
+      paymentMethodEnum = 'BANK_TRANSFER'; // Using BANK_TRANSFER for ESEWA
+    } else if (['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'CASH'].includes(paymentMethod)) {
+      paymentMethodEnum = paymentMethod;
+    }
     
     // Create payment record
     const payment = await prisma.payment.create({
       data: {
         amount: totalAmount,
         status: 'PENDING',
-        paymentMethod,
+        paymentMethod: paymentMethodEnum,
         userId: Number(userId)
       }
     });
     
-    // Create tickets
-    const tickets = await Promise.all(
-      selectedSeats.map(async (seat) => {
-        // Find pricing for this seat type
-        const pricingOption = showtime.pricingOptions.find(
-          option => option.seatTypeId === seat.seatTypeId
-        );
-        
-        // Use pricing option price or base price if not found
-        const price = pricingOption ? pricingOption.price : showtime.basePrice;
-        
-        return prisma.ticket.create({
-          data: {
-            showTimeId: Number(showtimeId),
-            userId: Number(userId),
-            seatId: seat.id,
-            price,
-            paymentId: payment.id,
-            qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
-          }
-        });
-      })
-    );
+    console.log('Payment created:', payment.id);
+    
+    // Create tickets using base price for all seats
+    const ticketPromises = selectedSeats.map(async (seat) => {
+      return prisma.ticket.create({
+        data: {
+          showTimeId: Number(showtimeId),
+          userId: Number(userId),
+          seatId: seat.id,
+          price: showtime.basePrice,
+          paymentId: payment.id,
+          qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+        }
+      });
+    });
+    
+    const tickets = await Promise.all(ticketPromises);
+    console.log('Tickets created:', tickets.length);
     
     res.status(201).json({
       message: 'Booking created successfully',
@@ -485,7 +472,7 @@ const getAvailableSeats = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating booking:', error);
-    res.status(500).json({ message: 'Failed to create booking' });
+    res.status(500).json({ message: 'Failed to create booking', error: error.message });
   }
 };
 
@@ -727,6 +714,38 @@ const updateUserProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to update user profile' });
   }
 };
+
+// Handle payment completion from eSewa
+const completePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { transactionId } = req.body;
+    
+    // Update payment status to COMPLETED
+    const payment = await prisma.payment.update({
+      where: { id: Number(id) },
+      data: {
+        status: 'COMPLETED',
+        transactionId: transactionId
+      },
+      include: {
+        tickets: true
+      }
+    });
+    
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+    
+    res.status(200).json({ 
+      message: 'Payment completed successfully',
+      payment
+    });
+  } catch (error) {
+    console.error('Error completing payment:', error);
+    res.status(500).json({ message: 'Failed to complete payment' });
+  }
+};
 const getshowtimesbyid = async (req,res) => {
   try {
     const {id} = req.params
@@ -767,6 +786,7 @@ export default {
   getFilmHalls,
   getFilmHall,
   createBooking,
+  completePayment,
   getFilmHall,
   getMovieCategories,
   getFilmHalls,
@@ -775,6 +795,5 @@ export default {
   getMovieShowtimes,
   getUserBookings,
   getFeaturedMovie,
-  getNowShowingMovies,
-
+  getNowShowingMovies
 }
