@@ -49,6 +49,7 @@ const Navbar = () => {
 
           {/* Desktop Auth */}
           <div className="hidden md:flex items-center gap-4">
+{console.log(currentUser)}
             {currentUser ? (
               <>
                 <Link to="/my-bookings" className="text-white hover:text-amber-500 transition-colors">

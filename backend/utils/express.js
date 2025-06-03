@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 import express from "express";
 import router from "../routes/route.js";
 import cors from "cors";
@@ -19,6 +23,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Important for parsing form data
 app.use(cookieParser());
+console.log(process.env.FRONTENDURL)
 app.use(
   cors({
     credentials: true,

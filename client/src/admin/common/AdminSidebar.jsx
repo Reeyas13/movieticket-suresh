@@ -170,7 +170,7 @@ export default function AdminSidebar({ open, setOpen }) {
   const sidebarRef = useRef(null);
  const links = [
   {
-    href: "/admin",
+    href: "/cinema",
     icon: <FaHome />,
     name: "Dashboard",
     sub: [],

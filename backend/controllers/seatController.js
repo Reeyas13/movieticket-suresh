@@ -19,7 +19,22 @@ const getSeats = async (req, res) => {
 // Get seats by hall ID
 const getSeatsByHallId = async (req, res) => {
   try {
-    const hallId = req.user.filmhallId;
+    const { hallId } = req.params;
+    
+    // For CINEMA users, verify the hall belongs to their filmhall
+    if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      const hall = await prisma.hall.findUnique({
+        where: { 
+          id: Number(hallId),
+          filmHallId: req.user.filmhallId
+        }
+      });
+      
+      if (!hall) {
+        return res.status(403).json({ error: 'You do not have access to this hall' });
+      }
+    }
+    
     const seats = await prisma.seat.findMany({
       where: { hallId: Number(hallId) },
       include: {
@@ -67,8 +82,8 @@ const getSeatById = async (req, res) => {
 // Create new seat
 const createSeat = async (req, res) => {
   try {
-    const { row, number, seatTypeId } = req.body;
-    const hallId = req.user.filmhallId;
+    const { row, number, seatTypeId, hallId } = req.body;
+    
     // Check if hall exists
     const hall = await prisma.hall.findUnique({
       where: { id: Number(hallId) }
@@ -76,6 +91,13 @@ const createSeat = async (req, res) => {
     
     if (!hall) {
       return res.status(404).json({ error: 'Hall not found' });
+    }
+    
+    // For CINEMA users, verify the hall belongs to their filmhall
+    if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      if (hall.filmHallId !== req.user.filmhallId) {
+        return res.status(403).json({ error: 'You can only create seats for halls in your film hall' });
+      }
     }
     
     // Check if seat type exists
@@ -126,11 +148,21 @@ const createMultipleSeats = async (req, res) => {
     
     // Check if hall exists
     const hall = await prisma.hall.findUnique({
-      where: { id: Number(hallId) }
+      where: { id: Number(hallId) },
+      include: {
+        filmHall: true
+      }
     });
     
     if (!hall) {
       return res.status(404).json({ error: 'Hall not found' });
+    }
+    
+    // For CINEMA users, verify the hall belongs to their filmhall
+    if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      if (hall.filmHallId !== req.user.filmhallId) {
+        return res.status(403).json({ error: 'You can only create seats for halls in your film hall' });
+      }
     }
     
     // Create all seats in a transaction
@@ -161,11 +193,25 @@ const updateSeat = async (req, res) => {
     
     // Check if seat exists
     const existingSeat = await prisma.seat.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
+      include: {
+        hall: {
+          include: {
+            filmHall: true
+          }
+        }
+      }
     });
     
     if (!existingSeat) {
       return res.status(404).json({ error: 'Seat not found' });
+    }
+    
+    // Access control check for CINEMA users
+    if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      if (existingSeat.hall.filmHallId !== req.user.filmhallId) {
+        return res.status(403).json({ error: 'You can only update seats in halls that belong to your film hall' });
+      }
     }
     
     // If changing hall or row/number, check for uniqueness
@@ -234,11 +280,25 @@ const deleteSeat = async (req, res) => {
     
     // Check if seat exists
     const existingSeat = await prisma.seat.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
+      include: {
+        hall: {
+          include: {
+            filmHall: true
+          }
+        }
+      }
     });
     
     if (!existingSeat) {
       return res.status(404).json({ error: 'Seat not found' });
+    }
+    
+    // Access control check for CINEMA users
+    if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      if (existingSeat.hall.filmHallId !== req.user.filmhallId) {
+        return res.status(403).json({ error: 'You can only delete seats in halls that belong to your film hall' });
+      }
     }
     
     // Check if seat is being used in any tickets

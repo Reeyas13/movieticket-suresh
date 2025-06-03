@@ -3,11 +3,33 @@ import prisma from "../prisma/prisma.js";
 
 const getFilmHalls = async (req, res) => {
   try {
-    const filmHalls = await prisma.filmHall.findMany({
-      include: {
-        halls: true,
-      }
-    });
+    // Role-based access control
+    let filmHalls = [];
+    
+    if (req.user.role === 'ADMIN') {
+      // Admins can see all film halls
+      filmHalls = await prisma.filmHall.findMany({
+        include: {
+          halls: true,
+        }
+      });
+    } else if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      // Cinema users can only see their own film hall
+      filmHalls = await prisma.filmHall.findMany({
+        where: { id: req.user.filmhallId },
+        include: {
+          halls: true,
+        }
+      });
+    } else {
+      // Regular users can see all film halls (or could be restricted if needed)
+      filmHalls = await prisma.filmHall.findMany({
+        include: {
+          halls: true,
+        }
+      });
+    }
+    
     res.json(filmHalls);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -18,6 +40,12 @@ const getFilmHalls = async (req, res) => {
 const getFilmHallById = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // For CINEMA users, check if they are requesting their own film hall
+    if (req.user.role === 'CINEMA' && req.user.filmhallId && Number(id) !== req.user.filmhallId) {
+      return res.status(403).json({ error: 'You do not have access to this film hall' });
+    }
+    
     const filmHall = await prisma.filmHall.findUnique({
       where: { id: Number(id) },
       include: {
@@ -47,6 +75,11 @@ const getFilmHallById = async (req, res) => {
 // Create new film hall
 const createFilmHall = async (req, res) => {
   try {
+    // Only ADMIN users can create film halls
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can create film halls' });
+    }
+    
     const { name, address, city, description, imageUrl } = req.body;
     
     const newFilmHall = await prisma.filmHall.create({
@@ -80,6 +113,16 @@ const updateFilmHall = async (req, res) => {
       return res.status(404).json({ error: 'Film hall not found' });
     }
     
+    // For CINEMA users, check if they are updating their own film hall
+    if (req.user.role === 'CINEMA') {
+      if (!req.user.filmhallId || Number(id) !== req.user.filmhallId) {
+        return res.status(403).json({ error: 'You can only update your own film hall' });
+      }
+    } else if (req.user.role !== 'ADMIN') {
+      // Regular users cannot update film halls
+      return res.status(403).json({ error: 'You do not have permission to update film halls' });
+    }
+    
     const updatedFilmHall = await prisma.filmHall.update({
       where: { id: Number(id) },
       data: {
@@ -100,15 +143,28 @@ const updateFilmHall = async (req, res) => {
 // Delete film hall
 const deleteFilmHall = async (req, res) => {
   try {
+    // Only ADMIN users can delete film halls
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can delete film halls' });
+    }
+    
     const { id } = req.params;
     
     // Check if film hall exists
     const existingFilmHall = await prisma.filmHall.findUnique({
-      where: { id: Number(id) }
+      where: { id: Number(id) },
+      include: {
+        halls: true
+      }
     });
     
     if (!existingFilmHall) {
       return res.status(404).json({ error: 'Film hall not found' });
+    }
+    
+    // Check if film hall has associated halls
+    if (existingFilmHall.halls && existingFilmHall.halls.length > 0) {
+      return res.status(400).json({ error: 'Cannot delete film hall with associated halls. Delete the halls first.' });
     }
     
     await prisma.filmHall.delete({

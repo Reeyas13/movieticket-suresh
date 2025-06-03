@@ -90,49 +90,77 @@ const createShowTime = async (req, res) => {
  */
 const getShowTimes = async (req, res) => {
   try {
-    // Get the user's film hall ID
-    // const user = await prisma.user.findUnique({
-    //   where: { id: req.user.filmhallId},
-    //   include: { filmhall: true },
-    // });
-    
-    // if (!user.filmhall) {
-    //   return res.status(403).json({ 
-    //     success: false,
-    //     message: 'You do not have a film hall associated with your account' 
-    //   });
-    // }
-    console.log(req.user)
-    const filmHallId = req.user.filmhallId
-    
-    // Get all halls for this film hall
-    const halls = await prisma.hall.findMany({
-      where: { filmHallId },
-      select: { id: true }
-    });
-    console.log(halls)
-    const hallIds = halls.map(hall => hall.id);
-    
-    // Find all showtimes for these halls
-    const showTimes = await prisma.showTime.findMany({
-      where: {
-        hallId: {
-          in: hallIds
-        }
-      },
-      include: {
-        movie: true,
-        hall: true,
-        pricingOptions: {
-          include: {
-            // seatType: true
+    console.log(req.user);
+    let showTimes = [];
+
+    // Different behavior based on user role
+    if (req.user.role === 'ADMIN') {
+      // Admin users can see all showtimes
+      showTimes = await prisma.showTime.findMany({
+        include: {
+          movie: true,
+          hall: true,
+          pricingOptions: {
+            include: {
+              seatType: true
+            }
           }
+        },
+        orderBy: {
+          startTime: 'asc'
         }
-      },
-      orderBy: {
-        startTime: 'asc'
+      });
+    } else if (req.user.role === 'CINEMA' && req.user.filmhallId) {
+      // Cinema users with filmhallId see showtimes for their halls
+      // Get all halls for this film hall
+      const halls = await prisma.hall.findMany({
+        where: { filmHallId: req.user.filmhallId },
+        select: { id: true }
+      });
+      
+      if (halls.length > 0) {
+        const hallIds = halls.map(hall => hall.id);
+        
+        // Find all showtimes for these halls
+        showTimes = await prisma.showTime.findMany({
+          where: {
+            hallId: {
+              in: hallIds
+            }
+          },
+          include: {
+            movie: true,
+            hall: true,
+            pricingOptions: {
+              include: {
+                seatType: true
+              }
+            }
+          },
+          orderBy: {
+            startTime: 'asc'
+          }
+        });
       }
-    });
+    } else {
+      // Regular users or cinema users without filmhallId get all public showtimes
+      // You might want to implement some kind of public/private flag for showtimes
+      // For now, just return all showtimes as there's no restriction mechanism
+      showTimes = await prisma.showTime.findMany({
+        include: {
+          movie: true,
+          hall: true,
+          pricingOptions: {
+            include: {
+              seatType: true
+            }
+          }
+        },
+        orderBy: {
+          startTime: 'asc'
+        }
+      });
+    }
     
     return res.status(200).json({
       success: true,

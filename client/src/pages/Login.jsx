@@ -11,8 +11,8 @@ const Login = () => {
   const { loading } = useSelector((state) => state.auth);
 
   const [credentials, setCredentials] = useState({
-    email: 'rohan@example.com',
-    password: 'SecurePass123!',
+    email: 'cinema@example.com',
+    password: 'password123',
   });
   const [showPassword, setShowPassword] = useState(false);
 

@@ -1,3 +1,8 @@
+
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 // middleware/authMiddleware.js
 import jwt from 'jsonwebtoken';
 

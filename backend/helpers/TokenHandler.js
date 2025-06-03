@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 import jwt from 'jsonwebtoken';
 
 const getTokenInfo = async (token) => {

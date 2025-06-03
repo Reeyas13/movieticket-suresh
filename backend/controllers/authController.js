@@ -49,13 +49,14 @@ export default {
     console.log(user);
 
     // Generate JWT token
+    
     const token = jwt.sign(
       { 
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
-        filmhallId: user.filmhall[0].id
+        filmhallId: user.filmhall.id
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }

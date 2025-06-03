@@ -11,6 +11,7 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
     rating: 4.8,
     releaseDate: "March 1, 2024"
   };
+  console.log(movie)
   const imageLink = JSON.parse(movie.image)[0]
   console.log(import.meta.env.VITE_API_IMAGE+imageLink)
 // console.log(typeof imageLink[0])
