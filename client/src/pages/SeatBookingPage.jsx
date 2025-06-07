@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../axios';
 
 const SeatBookingPage = () => {
   const { showtimeid } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
 
   // State variables
@@ -17,7 +16,55 @@ const SeatBookingPage = () => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [error, setError] = useState(null);
-  
+  const [notifications, setNotifications] = useState([]);
+
+  // Add notification helper
+  const addNotification = useCallback((message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  }, []);
+
+  // Helper function to update seat status
+  const updateSeatStatus = useCallback((seatId, newStatus) => {
+    console.log(`Updating seat ${seatId} to ${newStatus}`);
+    setSeats((prevSeats) => {
+      const updatedSeats = prevSeats.map((seat) =>
+        seat.id === seatId ? { ...seat, status: newStatus } : seat
+      );
+      
+      // Update seatsByRow as well
+      const newSeatsByRow = {};
+      updatedSeats.forEach(seat => {
+        if (!newSeatsByRow[seat.row]) {
+          newSeatsByRow[seat.row] = [];
+        }
+        newSeatsByRow[seat.row].push(seat);
+      });
+      
+      // Sort seats in each row by number
+      Object.keys(newSeatsByRow).forEach(row => {
+        newSeatsByRow[row].sort((a, b) => a.number - b.number);
+      });
+      
+      // Sort rows
+      const sortedRows = Object.keys(newSeatsByRow).sort((a, b) => {
+        return convertToNumeric(a) - convertToNumeric(b);
+      });
+      
+      const sortedGroupedByRow = {};
+      sortedRows.forEach(row => {
+        sortedGroupedByRow[row] = newSeatsByRow[row];
+      });
+      
+      setSeatsByRow(sortedGroupedByRow);
+      
+      return updatedSeats;
+    });
+  }, []);
+
   // Fetch data from API
   useEffect(() => {
     async function fetchData() {
@@ -25,8 +72,7 @@ const SeatBookingPage = () => {
         setLoading(true);
         const res = await api.get(`api/frontend/getshowtimesbyid/${showtimeid}`);
         const data = res.data;
-        console.log(data)
-        // Set state with real data
+        console.log('Showtime data:', data); // Debug API response
         setShowtime(data);
         setMovie(data.movie);
         setHall(data.hall);
@@ -43,23 +89,26 @@ const SeatBookingPage = () => {
   }, [showtimeid]);
 
   // Process seats and organize them by row
-  const processSeats = (seatsData) => {
+  const processSeats = useCallback((seatsData) => {
     if (!seatsData || !Array.isArray(seatsData)) return;
     
     // Process all seats
     const processedSeats = seatsData.map(seat => {
+      const price = getPrice(seat.seatTypeId);
+      const status = seat.tickets && seat.tickets.length > 0 ? 'booked' : 'available';
       return {
         id: seat.id.toString(),
-        row: seat.row,  // Keep original row for backend reference
-        displayRow: convertToNumeric(seat.row), // Convert row to numeric for display
+        row: seat.row,
+        displayRow: convertToNumeric(seat.row),
         number: seat.number,
         type: seat.seatType ? (seat.seatType.name === 'r' ? 'regular' : 'special') : 'regular',
-        status: seat.tickets && seat.tickets.length > 0 ? 'booked' : 'available',
-        price: getPrice(seat.seatTypeId),
+        status,
+        price,
         seatTypeId: seat.seatTypeId
       };
     });
     
+    console.log('Processed seats:', processedSeats); // Debug processed seats
     setSeats(processedSeats);
     
     // Group seats by row
@@ -86,110 +135,110 @@ const SeatBookingPage = () => {
     });
     
     setSeatsByRow(sortedGroupedByRow);
-  };
+  }, [showtime]);
 
-  // Convert alphabetic row (e.g., 'A', 'B') to numeric (1, 2)
-  const convertToNumeric = (row) => {
+  // Convert alphabetic row to numeric
+  const convertToNumeric = useCallback((row) => {
     if (!row) return 1;
-    if (!isNaN(row)) return Number(row); // If already numeric
-    
-    // If alphabetic, convert to numeric (A=1, B=2, etc.)
+    if (!isNaN(row)) return Number(row);
     return row.toUpperCase().charCodeAt(0) - 64;
-  };
+  }, []);
 
-  // Get price based on seat type from pricing options
-  const getPrice = (seatTypeId) => {
-    if (!showtime || !showtime.pricingOptions) return 0;
+  // Get price based on seat type
+  const getPrice = useCallback((seatTypeId) => {
+    if (!showtime || !showtime.pricingOptions) {
+      console.warn(`No pricing options available for seatTypeId: ${seatTypeId}, returning default price`);
+      return 10.0; // Default price if no pricing options
+    }
     
     const pricingOption = showtime.pricingOptions.find(
       option => option.seatTypeId === seatTypeId
     );
     
-    return pricingOption ? parseFloat(pricingOption.price) : parseFloat(showtime.basePrice);
-  };
+    const price = pricingOption ? parseFloat(pricingOption.price) : parseFloat(showtime.basePrice || 10.0);
+    console.log(`Price for seatTypeId ${seatTypeId}: ${price}`);
+    return isNaN(price) ? 10.0 : price; // Fallback to 10.0 if price is NaN
+  }, [showtime]);
 
-  // Calculate total price whenever selected seats change
+  // Calculate total price
   useEffect(() => {
     let price = 0;
     selectedSeats.forEach(seatId => {
       const seat = seats.find(s => s.id === seatId);
       if (seat) {
+        if (seat.price === 0 || isNaN(seat.price)) {
+          console.warn(`Seat ${seatId} has invalid price: ${seat.price}`);
+        }
         price += seat.price || 0;
       }
     });
+    console.log(`Calculated total price: ${price} for seats: ${selectedSeats.join(', ')}`);
     setTotalPrice(price);
   }, [selectedSeats, seats]);
 
+  // Handle seat selection
   const handleSeatClick = useCallback((seatId) => {
     const seat = seats.find(s => s.id === seatId);
     if (!seat || seat.status === 'booked') return;
 
-    const newStatus = seat.status === 'available' ? 'selected' : 'available';
-
-    // Update seats
-    const updatedSeats = seats.map(s => 
-      s.id === seatId ? { ...s, status: newStatus } : s
-    );
-    setSeats(updatedSeats);
-
-    // Update seatsByRow
-    setSeatsByRow(prev => {
-      const newSeatsByRow = { ...prev };
-      if (newSeatsByRow[seat.row]) {
-        newSeatsByRow[seat.row] = newSeatsByRow[seat.row].map(s => 
-          s.id === seatId ? { ...s, status: newStatus } : s
-        );
-      }
-      return newSeatsByRow;
-    });
-
-    // Update selectedSeats
-    if (newStatus === 'selected') {
-      setSelectedSeats(prev => [...prev, seatId]);
-    } else {
-      setSelectedSeats(prev => prev.filter(id => id !== seatId));
+    if (seat.price === 0 || isNaN(seat.price)) {
+      console.warn(`Seat ${seatId} has invalid price: ${seat.price}`);
+      addNotification(`Warning: Seat ${seatId} has no price set`, 'warning');
     }
-  }, [seats]);
+
+    if (seat.status === 'available') {
+      setSelectedSeats(prev => [...prev, seatId]);
+      updateSeatStatus(seatId, 'selected');
+      addNotification(`Seat ${seatId} selected`, 'success');
+    } else if (seat.status === 'selected') {
+      setSelectedSeats(prev => prev.filter(id => id !== seatId));
+      updateSeatStatus(seatId, 'available');
+      addNotification(`Seat ${seatId} deselected`, 'info');
+    }
+  }, [seats, updateSeatStatus, addNotification]);
 
   const handleProceedToPayment = useCallback(async () => {
     if (selectedSeats.length === 0) return;
 
     try {
-      // Set static user ID as 1 for this implementation
-      const userId = 1;
-      
-      // First create the booking in the database
+      // Create booking
+      const userId = 1; // Should come from auth context
       const bookingData = {
-        userId: userId,
+        userId,
         showtimeId: showtime.id,
         seats: selectedSeats,
-        paymentMethod: 'ESEWA' // Using eSewa as payment method
+        paymentMethod: 'ESEWA'
       };
       
       // Create booking and get payment details
       const response = await api.post('api/frontend/bookings', bookingData);
       const { payment, tickets } = response.data;
       
+      // Update seats to booked status
+      selectedSeats.forEach(seatId => {
+        updateSeatStatus(seatId, 'booked');
+      });
+      
       // Prepare eSewa parameters
       const esewaParams = {
-        amt: totalPrice, // Amount
-        psc: 0, // Service charge
-        pdc: 0, // Delivery charge
-        txAmt: 0, // Tax amount
-        tAmt: totalPrice, // Total amount
-        pid: payment.id, // Payment ID
-        scd: 'EPAYTEST', // Merchant code (test)
-        su: `${window.location.origin}/booking-success`, // Success URL
-        fu: `${window.location.origin}/booking-failed` // Failure URL
+        amt: totalPrice,
+        psc: 0,
+        pdc: 0,
+        txAmt: 0,
+        tAmt: totalPrice,
+        pid: payment.id,
+        scd: 'EPAYTEST',
+        su: `${window.location.origin}/booking-success`,
+        fu: `${window.location.origin}/booking-failed`
       };
       
-      // Create a form to submit to eSewa
+      // Create form to submit to eSewa
       const form = document.createElement('form');
       form.setAttribute('method', 'POST');
       form.setAttribute('action', 'https://uat.esewa.com.np/epay/main');
       form.setAttribute('target', '_blank');
       
-      // Add parameters to the form
+      // Add parameters to form
       for (const key in esewaParams) {
         const hiddenField = document.createElement('input');
         hiddenField.setAttribute('type', 'hidden');
@@ -198,14 +247,9 @@ const SeatBookingPage = () => {
         form.appendChild(hiddenField);
       }
       
-      // Append the form to the body and submit it
       document.body.appendChild(form);
       
-      // For demo purposes, we'll simulate a successful payment without submitting the form
-      // In a real application, you would uncomment the next line to submit the form
-      // form.submit();
-      
-      // Simulate a successful payment and update payment status
+      // For demo: simulate payment success
       try {
         await api.post(`api/frontend/payments/${payment.id}/complete`, { transactionId: `ESEWA-${Date.now()}` });
       } catch (error) {
@@ -216,7 +260,7 @@ const SeatBookingPage = () => {
       
       alert(`Payment successful! Total: Rs. ${totalPrice.toFixed(2)}\nTicket IDs: ${tickets.map(t => t.id).join(', ')}`);
       
-      // Navigate to a booking success page
+      // Navigate to success page
       navigate('/booking-success', { 
         state: { 
           movie,
@@ -229,9 +273,9 @@ const SeatBookingPage = () => {
       });
     } catch (error) {
       console.error('Error processing payment:', error);
-      alert('Payment failed. Please try again.');
+      addNotification(`Payment failed: ${error.response?.data?.message || 'Server error'}`, 'error');
     }
-  }, [navigate, selectedSeats, movie, showtime, seats, totalPrice]);
+  }, [navigate, selectedSeats, movie, showtime, seats, totalPrice, updateSeatStatus, addNotification]);
 
   const handleBackToMovie = () => {
     navigate(`/movie/${movie?.id}`);
@@ -239,22 +283,8 @@ const SeatBookingPage = () => {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <div style={{ 
-          width: '3rem', 
-          height: '3rem', 
-          border: '4px solid #F3F4F6', 
-          borderTop: '4px solid #F59E0B',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-        }}></div>
+      <div className="flex justify-center items-center h-[50vh] flex-col gap-4">
+        <div className="w-12 h-12 border-4 border-gray-100 border-t-amber-500 rounded-full animate-spin"></div>
         <p>Loading seat information...</p>
       </div>
     );
@@ -262,25 +292,11 @@ const SeatBookingPage = () => {
 
   if (error) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
+      <div className="flex justify-center items-center h-[50vh] flex-col gap-4">
         <p>{error}</p>
         <button 
           onClick={() => navigate('/movies')}
-          style={{
-            backgroundColor: '#F59E0B',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '0.375rem',
-            border: 'none',
-            cursor: 'pointer'
-          }}
+          className="bg-amber-500 text-white px-4 py-2 rounded-md border-none cursor-pointer"
         >
           Back to Movies
         </button>
@@ -290,25 +306,11 @@ const SeatBookingPage = () => {
 
   if (!movie || !showtime || !hall) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
+      <div className="flex justify-center items-center h-[50vh] flex-col gap-4">
         <p>Required information is missing. Please try selecting the movie again.</p>
         <button 
           onClick={() => navigate('/movies')}
-          style={{
-            backgroundColor: '#F59E0B',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '0.375rem',
-            border: 'none',
-            cursor: 'pointer'
-          }}
+          className="bg-amber-500 text-white px-4 py-2 rounded-md border-none cursor-pointer"
         >
           Back to Movies
         </button>
@@ -322,30 +324,34 @@ const SeatBookingPage = () => {
   const formattedTime = showtimeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div style={{ 
-      maxWidth: '1200px', 
-      margin: '0 auto', 
-      padding: '2rem 1rem' 
-    }}>
-      <div style={{ 
-        marginBottom: '1.5rem' 
-      }}>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Notifications */}
+      {notifications.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 space-y-2">
+          {notifications.map(notification => (
+            <div
+              key={notification.id}
+              className={`px-4 py-2 rounded-md shadow-lg transition-all duration-300 ${
+                notification.type === 'error' ? 'bg-red-400 text-white' :
+                notification.type === 'warning' ? 'bg-yellow-500 text-white' :
+                notification.type === 'success' ? 'bg-green-500 text-white' :
+                'bg-blue-500 text-white'
+              }`}
+            >
+              {notification.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-6">
         <button
           onClick={handleBackToMovie}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            color: '#6B7280',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '0',
-            transition: 'color 0.2s'
-          }}
+          className="flex items-center text-gray-500 bg-transparent border-none cursor-pointer p-0 transition-colors hover:text-gray-700"
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            style={{ height: '1.25rem', width: '1.25rem', marginRight: '0.5rem' }} 
+            className="w-5 h-5 mr-2" 
             fill="none" 
             viewBox="0 0 24 24" 
             stroke="currentColor"
@@ -361,31 +367,14 @@ const SeatBookingPage = () => {
         </button>
       </div>
       
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '1.5rem', 
-        marginBottom: '2rem' 
-      }}>
-        <h1 style={{ 
-          fontSize: '1.875rem', 
-          fontWeight: 'bold', 
-          color: '#1F2937' 
-        }}>{movie.title}</h1>
+      <div className="flex flex-col gap-6 mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">{movie.title}</h1>
         
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '1rem' 
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            color: '#6B7280' 
-          }}>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex items-center text-gray-500">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              style={{ height: '1.25rem', width: '1.25rem', marginRight: '0.5rem', color: '#F59E0B' }} 
+              className="w-5 h-5 mr-2 text-amber-500" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"
@@ -400,14 +389,10 @@ const SeatBookingPage = () => {
             {formattedDate}
           </div>
           
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            color: '#6B7280' 
-          }}>
+          <div className="flex items-center text-gray-500">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              style={{ height: '1.25rem', width: '1.25rem', marginRight: '0.5rem', color: '#F59E0B' }} 
+              className="w-5 h-5 mr-2 text-amber-500" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"
@@ -422,14 +407,10 @@ const SeatBookingPage = () => {
             {formattedTime}
           </div>
           
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            color: '#6B7280' 
-          }}>
+          <div className="flex items-center text-gray-500">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              style={{ height: '1.25rem', width: '1.25rem', marginRight: '0.5rem', color: '#F59E0B' }} 
+              className="w-5 h-5 mr-2 text-amber-500" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"
@@ -444,14 +425,10 @@ const SeatBookingPage = () => {
             {hall.name} - Capacity: {hall.capacity}
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            color: '#6B7280' 
-          }}>
+          <div className="flex items-center text-gray-500">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              style={{ height: '1.25rem', width: '1.25rem', marginRight: '0.5rem', color: '#F59E0B' }} 
+              className="w-5 h-5 mr-2 text-amber-500" 
               fill="none" 
               viewBox="0 0 24 24" 
               stroke="currentColor"
@@ -463,91 +440,49 @@ const SeatBookingPage = () => {
                 d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
               />
             </svg>
-            Base Price: Rs. {showtime.basePrice}
+            Base Price: Rs. {showtime.basePrice || 'N/A'}
           </div>
         </div>
       </div>
       
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '2rem' 
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1.5rem' 
-        }}>
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           {/* Screen */}
-          <div style={{ 
-            backgroundColor: '#E5E7EB', 
-            height: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem', 
-            position: 'relative', 
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
-          }}>
-            <div style={{ 
-              position: 'absolute', 
-              bottom: '-1.5rem', 
-              left: '50%', 
-              transform: 'translateX(-50%)', 
-              color: '#6B7280', 
-              fontSize: '0.875rem', 
-              whiteSpace: 'nowrap' 
-            }}>Screen</div>
+          <div className="bg-gray-200 h-8 rounded-lg mb-8 relative shadow-md">
+            <div className="absolute bottom-[-1.5rem] left-1/2 transform -translate-x-1/2 text-gray-500 text-sm whitespace-nowrap">
+              Screen
+            </div>
           </div>
           
           {/* Seats */}
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '0.75rem', 
-            alignItems: 'center' 
-          }}>
+          <div className="flex flex-col gap-3 items-center">
             {Object.entries(seatsByRow).map(([row, rowSeats]) => (
               <div 
                 key={row} 
-                style={{ 
-                  display: 'flex', 
-                  gap: '0.5rem', 
-                  alignItems: 'center' 
-                }}
+                className="flex gap-2 items-center"
               >
-                <div style={{ 
-                  width: '1.5rem', 
-                  textAlign: 'center', 
-                  fontWeight: '500', 
-                  color: '#6B7280' 
-                }}>{rowSeats[0]?.displayRow || convertToNumeric(row)}</div>
+                <div className="w-6 text-center font-medium text-gray-500">
+                  {rowSeats[0]?.displayRow || convertToNumeric(row)}
+                </div>
                 
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '0.5rem' 
-                }}>
+                <div className="flex gap-2">
                   {rowSeats.map(seat => (
                     <button 
                       key={seat.id} 
                       onClick={() => handleSeatClick(seat.id)}
                       disabled={seat.status === 'booked'}
-                      style={{ 
-                        width: '2.5rem', 
-                        height: '2.5rem', 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        borderRadius: '0.25rem', 
-                        border: 'none', 
-                        backgroundColor: 
-                          seat.status === 'booked' ? '#9CA3AF' : 
-                          seat.status === 'selected' ? '#F59E0B' : 
-                          seat.type === 'special' ? '#EDE9FE' : '#F3F4F6',
-                        color: 
-                          seat.status === 'booked' ? '#F3F4F6' : 
-                          seat.status === 'selected' ? 'white' : '#4B5563',
-                        cursor: seat.status === 'booked' ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s'
-                      }}
+                      className={`
+                        w-10 h-10 flex justify-center items-center rounded border-none
+                        ${seat.status === 'booked' 
+                          ? 'bg-red-400 text-white cursor-not-allowed' 
+                          : seat.status === 'selected' 
+                            ? 'bg-amber-500 text-white cursor-pointer'
+                            : seat.type === 'special' 
+                              ? 'bg-purple-100 text-gray-700 cursor-pointer'
+                              : 'bg-gray-100 text-gray-700 cursor-pointer'
+                        }
+                        transition-all duration-200
+                      `}
                     >
                       {seat.number}
                     </button>
@@ -558,84 +493,61 @@ const SeatBookingPage = () => {
           </div>
         </div>
         
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '1.5rem' 
-        }}>
+        <div className="flex flex-col gap-6">
           {/* Legend */}
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: '1rem', 
-            justifyContent: 'center' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: '1rem', height: '1rem', backgroundColor: '#F3F4F6', borderRadius: '0.25rem', marginRight: '0.5rem' }}></div>
-              <span style={{ fontSize: '0.875rem' }}>Regular (Rs. {
-                showtime.pricingOptions.find(option => option.seatTypeId === 6)?.price || showtime.basePrice
-              })</span>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gray-100 rounded mr-2"></div>
+              <span className="text-sm">
+                Regular (Rs. {
+                  showtime.pricingOptions?.find(option => option.seatTypeId === 6)?.price || showtime.basePrice || 'N/A'
+                })
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: '1rem', height: '1rem', backgroundColor: '#EDE9FE', borderRadius: '0.25rem', marginRight: '0.5rem' }}></div>
-              <span style={{ fontSize: '0.875rem' }}>Special (Rs. {
-                showtime.pricingOptions.find(option => option.seatTypeId === 5)?.price || showtime.basePrice
-              })</span>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-purple-100 rounded mr-2"></div>
+              <span className="text-sm">
+                Special (Rs. {
+                  showtime.pricingOptions?.find(option => option.seatTypeId === 5)?.price || showtime.basePrice || 'N/A'
+                })
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: '1rem', height: '1rem', backgroundColor: '#F59E0B', borderRadius: '0.25rem', marginRight: '0.5rem' }}></div>
-              <span style={{ fontSize: '0.875rem' }}>Selected</span>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-amber-500 rounded mr-2"></div>
+              <span className="text-sm">Selected</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ width: '1rem', height: '1rem', backgroundColor: '#9CA3AF', borderRadius: '0.25rem', marginRight: '0.5rem' }}></div>
-              <span style={{ fontSize: '0.875rem' }}>Booked</span>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-red-400 rounded mr-2"></div>
+              <span className="text-sm">Booked</span>
             </div>
           </div>
           
           {/* Booking Summary */}
-          <div style={{ 
-            backgroundColor: '#F3F4F6', 
-            padding: '1.5rem', 
-            borderRadius: '0.5rem' 
-          }}>
-            <h3 style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: 'bold', 
-              marginBottom: '1rem', 
-              color: '#1F2937' 
-            }}>Booking Summary</h3>
+          <div className="bg-gray-100 p-6 rounded-lg">
+            <h3 className="text-xl font-bold mb-4 text-gray-800">Booking Summary</h3>
             
-            <div style={{ 
-              marginBottom: '1rem' 
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                marginBottom: '0.5rem' 
-              }}>
-                <span style={{ color: '#4B5563' }}>Selected Seats:</span>
-                <span style={{ color: '#1F2937' }}>{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None'}</span>
+            <div className="mb-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-700">Selected Seats:</span>
+                <span className="text-gray-800">
+                  {selectedSeats.length > 0 ? selectedSeats.join(', ') : 'None'}
+                </span>
               </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                fontWeight: 'bold' 
-              }}>
-                <span style={{ color: '#1F2937' }}>Total Price:</span>
-                <span style={{ color: '#1F2937' }}>Rs. {totalPrice.toFixed(2)}</span>
+              <div className="flex justify-between font-bold">
+                <span className="text-gray-800">Total Price:</span>
+                <span className="text-gray-800">Rs. {totalPrice.toFixed(2)}</span>
               </div>
             </div>
             
             <button 
-              style={{ 
-                width: '100%', 
-                padding: '0.75rem', 
-                borderRadius: '0.375rem',
-                backgroundColor: selectedSeats.length > 0 ? '#F59E0B' : '#D1D5DB',
-                color: selectedSeats.length > 0 ? 'white' : '#6B7280',
-                border: 'none',
-                cursor: selectedSeats.length > 0 ? 'pointer' : 'not-allowed'
-              }}
+              className={`
+                w-full py-3 rounded-md border-none
+                ${selectedSeats.length > 0
+                  ? 'bg-amber-500 text-white cursor-pointer hover:bg-amber-600' 
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }
+                transition-colors duration-200
+              `}
               onClick={handleProceedToPayment}
               disabled={selectedSeats.length === 0}
             >

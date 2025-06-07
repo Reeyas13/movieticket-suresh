@@ -152,8 +152,9 @@ model Ticket {
   qrCode     String?   // for ticket validation
   isUsed     Boolean   @default(false)
   createdAt  DateTime  @default(now())
+  
   updatedAt  DateTime  @updatedAt
-
+  selectionStatus TicketStatus @default(SELECTED)
   @@unique([showTimeId, seatId])
   @@map("tickets")
 }
@@ -182,6 +183,10 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum TicketStatus {
+  SELECTED
+  BOOKED
+}
 // Payment method enum
 enum PaymentMethod {
   CREDIT_CARD

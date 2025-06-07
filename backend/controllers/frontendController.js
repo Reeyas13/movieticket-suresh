@@ -457,6 +457,7 @@ const createBooking = async (req, res) => {
           seatId: seat.id,
           price: showtime.basePrice,
           paymentId: payment.id,
+          selectionStatus: 'BOOKED',
           qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
         }
       });
@@ -771,6 +772,7 @@ const getshowtimesbyid = async (req,res) => {
         id: Number(id)
        }
      })
+     console.log(data)
      res.json(data)
   } catch (error) {
     

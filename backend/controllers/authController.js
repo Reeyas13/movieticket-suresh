@@ -56,7 +56,7 @@ export default {
         email: user.email,
         name: user.name,
         role: user.role,
-        filmhallId: user.filmhall.id
+        filmhallId: user?.filmhall?.id
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }

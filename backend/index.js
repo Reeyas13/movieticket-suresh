@@ -17,6 +17,6 @@ import { fileURLToPath } from "url";
 // })
 
 
-app.listen(process.env.PORT || 5000, () => {
-    console.log(`MovieTicket backend is running on http://localhost:${process.env.PORT}`); 
-});
+// app.listen(process.env.PORT || 5000, () => {
+//     console.log(`MovieTicket backend is running on http://localhost:${process.env.PORT}`); 
+// });

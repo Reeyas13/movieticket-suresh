@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-
+// import { Server as SocketIOServer } from "socket.io";
+import http from 'http';
+import { Server as SocketIOServer } from "socket.io";
 // Load environment variables from .env file
 dotenv.config();
 import express from "express";
@@ -13,11 +15,13 @@ import {
   handleEsewaSuccess,
   updateOrderAfterPayment,
 } from "../controllers/esewa.js";
+import testingController from '../controllers/testingController.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
 
 // middlewares
 app.use(express.json());
@@ -31,6 +35,25 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
+
+const server = http.createServer(app); 
+
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: "*",  // ⚠️ just for testing
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+
+io.on("connection", (socket) => {
+  testingController.onConnection(socket, io);
+});
+
+server.listen(5000, () => {
+  console.log(`MovieTicket backend is running on http://localhost:5000`);
+});
 
 // Configure static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

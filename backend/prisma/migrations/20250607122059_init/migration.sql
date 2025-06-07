@@ -25,6 +25,7 @@ CREATE TABLE `film_halls` (
     `updatedAt` DATETIME(3) NOT NULL,
     `userId` INTEGER NOT NULL,
 
+    UNIQUE INDEX `film_halls_userId_key`(`userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -56,7 +57,7 @@ CREATE TABLE `seats` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `row` VARCHAR(191) NOT NULL,
     `number` INTEGER NOT NULL,
-    `seatTypeId` INTEGER NOT NULL,
+    `seatTypeId` INTEGER NULL,
     `hallId` INTEGER NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -123,6 +124,7 @@ CREATE TABLE `tickets` (
     `isUsed` BOOLEAN NOT NULL DEFAULT false,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
+    `selectionStatus` ENUM('SELECTED', 'BOOKED') NOT NULL DEFAULT 'SELECTED',
 
     UNIQUE INDEX `tickets_showTimeId_seatId_key`(`showTimeId`, `seatId`),
     PRIMARY KEY (`id`)
@@ -149,7 +151,7 @@ ALTER TABLE `film_halls` ADD CONSTRAINT `film_halls_userId_fkey` FOREIGN KEY (`u
 ALTER TABLE `halls` ADD CONSTRAINT `halls_filmHallId_fkey` FOREIGN KEY (`filmHallId`) REFERENCES `film_halls`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `seats` ADD CONSTRAINT `seats_seatTypeId_fkey` FOREIGN KEY (`seatTypeId`) REFERENCES `seat_types`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `seats` ADD CONSTRAINT `seats_seatTypeId_fkey` FOREIGN KEY (`seatTypeId`) REFERENCES `seat_types`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `seats` ADD CONSTRAINT `seats_hallId_fkey` FOREIGN KEY (`hallId`) REFERENCES `halls`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

@@ -26,6 +26,7 @@ import SeatBookingPage from './pages/SeatBookingPage';
 import PaymentPage from './pages/PaymentPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import ProfilePage from './pages/ProfilePage';
+import SocketTest from './SocketTest';
 function App() {
   const [count, setCount] = useState(0)
   return (
@@ -41,6 +42,7 @@ function App() {
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/bookings" element={<MyBookingsPage />} />
           <Route path="/my-profile" element={<ProfilePage />} />
+          <Route path="/soc" element={<SocketTest />} />
 </Route>
           <Route path="/login" element={<Login />} />
           <Route path="/cinema" element={<AdminLayout />}>

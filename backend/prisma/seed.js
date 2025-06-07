@@ -8,7 +8,7 @@ async function main() {
 
   // Clean up existing data - delete in reverse order of dependencies
   console.log('Cleaning up existing data...');
-  await prisma.ticket.deleteMany({});
+  // await prisma.ticket.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.showTimePricing.deleteMany({});
   await prisma.showTime.deleteMany({});
@@ -383,6 +383,7 @@ async function main() {
       price: sampleShowtime.basePrice * 1.5,
       paymentId: payment.id,
       qrCode: `TICKET-${sampleShowtime.id}-${vipSeat.id}-${regularUser.id}`,
+      selectionStatus: 'BOOKED',
       isUsed: false
     }
   });
