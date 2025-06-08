@@ -401,70 +401,121 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ message: 'One or more selected seats are invalid' });
     }
     
-    // Check if any of the selected seats are already booked
-    const existingBookings = await prisma.ticket.findMany({
+    // Check existing tickets for these seats in this showtime
+    const existingTickets = await prisma.ticket.findMany({
       where: {
         showTimeId: Number(showtimeId),
         seatId: {
           in: seats.map(seatId => Number(seatId))
         }
+      },
+      include: {
+        payment: true
       }
     });
     
-    if (existingBookings.length > 0) {
+    console.log('Existing tickets:', existingTickets);
+    
+    // Check for conflicts
+    const conflictingTickets = existingTickets.filter(ticket => 
+      ticket.userId !== Number(userId) || ticket.selectionStatus === 'BOOKED'
+    );
+    
+    if (conflictingTickets.length > 0) {
       return res.status(400).json({ 
-        message: 'Some seats are already booked', 
-        bookedSeats: existingBookings.map(booking => booking.seatId) 
+        message: 'Some seats are already booked or selected by another user', 
+        conflictingSeats: conflictingTickets.map(ticket => ({
+          seatId: ticket.seatId,
+          status: ticket.selectionStatus,
+          userId: ticket.userId
+        }))
       });
     }
     
-    // Calculate total price using base price since we're not using seat types
+    // Calculate total price using base price
     const totalAmount = selectedSeats.length * parseFloat(showtime.basePrice);
-    console.log('Base price per seat:', showtime.basePrice);
-    console.log('Number of seats:', selectedSeats.length);
-    
     console.log('Total amount calculated:', totalAmount);
     
     // Map payment method to enum value
-    // Available options in enum: CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER, CASH
-    let paymentMethodEnum = 'CREDIT_CARD'; // Default
+    let paymentMethodEnum = 'ESEWA'; // Default
     
-    if (paymentMethod === 'ESEWA') {
-      // Map ESEWA to one of the available enum values
-      paymentMethodEnum = 'BANK_TRANSFER'; // Using BANK_TRANSFER for ESEWA
-    } else if (['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'CASH'].includes(paymentMethod)) {
-      paymentMethodEnum = paymentMethod;
-    }
+    // if (paymentMethod === 'ESEWA') {
+    //   paymentMethodEnum = 'BANK_TRANSFER';
+    // } else if (['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'CASH'].includes(paymentMethod)) {
+    //   paymentMethodEnum = paymentMethod;
+    // }
     
-    // Create payment record
-    const payment = await prisma.payment.create({
-      data: {
-        amount: totalAmount,
-        status: 'PENDING',
-        paymentMethod: paymentMethodEnum,
-        userId: Number(userId)
-      }
-    });
+    // Create or update payment record
+    let payment;
+    const userSelectedTickets = existingTickets.filter(ticket => 
+      ticket.userId === Number(userId) && ticket.selectionStatus === 'SELECTED'
+    );
     
-    console.log('Payment created:', payment.id);
-    
-    // Create tickets using base price for all seats
-    const ticketPromises = selectedSeats.map(async (seat) => {
-      return prisma.ticket.create({
+    if (userSelectedTickets.length > 0) {
+      // Update existing payment
+      const existingPaymentId = userSelectedTickets[0].paymentId;
+      payment = await prisma.payment.update({
+        where: { id: existingPaymentId },
         data: {
-          showTimeId: Number(showtimeId),
-          userId: Number(userId),
-          seatId: seat.id,
-          price: showtime.basePrice,
-          paymentId: payment.id,
-          selectionStatus: 'BOOKED',
-          qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+          amount: totalAmount,
+          status: 'PENDING',
+          paymentMethod: paymentMethodEnum
         }
       });
-    });
+      console.log('Payment updated:', payment.id);
+    } else {
+      // Create new payment
+      payment = await prisma.payment.create({
+        data: {
+          amount: totalAmount,
+          status: 'PENDING',
+          paymentMethod: paymentMethodEnum,
+          userId: Number(userId)
+        }
+      });
+      console.log('Payment created:', payment.id);
+    }
     
+    // Update or create tickets
+    const ticketPromises = selectedSeats.map(async (seat) => {
+      // Check if ticket already exists for this user, seat, and showtime
+      const existingTicket = existingTickets.find(ticket => 
+        ticket.seatId === seat.id && 
+        ticket.userId === Number(userId)
+      );
+      
+      if (existingTicket) {
+        // Update existing ticket
+        return await prisma.ticket.update({
+          where: {
+            id: existingTicket.id
+          },
+          data: {
+            price: showtime.basePrice,
+            paymentId: payment.id,
+            selectionStatus: 'BOOKED',
+            qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+          }
+        });
+      } else {
+        // Create new ticket
+        return await prisma.ticket.create({
+          data: {
+            showTimeId: Number(showtimeId),
+            userId: Number(userId),
+            seatId: seat.id,
+            price: showtime.basePrice,
+            paymentId: payment.id,
+            // selectionStatus: 'BOOKED',
+            qrCode: `TICKET-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+          }
+        });
+      }
+    });
+
     const tickets = await Promise.all(ticketPromises);
-    console.log('Tickets created:', tickets.length);
+    
+    console.log('Tickets processed:', tickets.length);
     
     res.status(201).json({
       message: 'Booking created successfully',

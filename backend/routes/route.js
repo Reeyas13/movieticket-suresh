@@ -9,6 +9,7 @@ import seatTypeRoutes from "./seatTypesRoutes.js";
 import movieRoutes from "./movieRoutes.js";
 import showTimeRoutes from "./showTimeRoutes.js";
 import frontedRoutes from "./frontedRoutes.js";
+import paymentRoutes from "./paymentRoutes.js";
 const router = Router();
 
 router.use("/", authRoutes)
@@ -20,6 +21,7 @@ router.use("/seat-type", seatTypeRoutes)
 router.use("/movies", movieRoutes)
 router.use("/show-times", showTimeRoutes)
 router.use("/frontend", frontedRoutes)
+router.use("/", paymentRoutes)
 
 
 

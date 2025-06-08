@@ -49,28 +49,28 @@ export const updateOrderAfterPayment = async (req, res, next) => {
       },
     });
     // console.log(object);
-    const order = await prisma.order.findFirst({
-      where: {
-        id: parseInt(payment.orderId),
-      },
-      include: {
-        products: true,
-        payments: true,
-      },
-    });
+    // const order = await prisma.order.findFirst({
+    //   where: {
+    //     id: parseInt(payment.orderId),
+    //   },
+    //   include: {
+    //     products: true,
+    //     payments: true,
+    //   },
+    // });
 
-    console.log(order);
-    const payments = await prisma.orderPayment.update({
-      where: {
-        id: parseInt(order.payment_id),
-      },
-      data: {
-        provider: "esewa",
-        amountPaid: parseFloat(req.total_amount),
-        paymentType: "esewa",
-        paidAt: new Date(Date.now()),
-      },
-    });
+    // console.log(order);
+    // const payments = await prisma.orderPayment.update({
+    //   where: {
+    //     id: parseInt(order.payment_id),
+    //   },
+    //   data: {
+    //     provider: "esewa",
+    //     amountPaid: parseFloat(req.total_amount),
+    //     paymentType: "esewa",
+    //     paidAt: new Date(Date.now()),
+    //   },
+    // });
 
     res.redirect(
       "http://localhost:5173/payment-success?transaction_code=" +

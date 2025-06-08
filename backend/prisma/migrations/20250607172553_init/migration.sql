@@ -119,7 +119,7 @@ CREATE TABLE `tickets` (
     `userId` INTEGER NOT NULL,
     `seatId` INTEGER NOT NULL,
     `price` DECIMAL(10, 2) NOT NULL,
-    `paymentId` INTEGER NOT NULL,
+    `paymentId` VARCHAR(191) NOT NULL,
     `qrCode` VARCHAR(191) NULL,
     `isUsed` BOOLEAN NOT NULL DEFAULT false,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -132,12 +132,14 @@ CREATE TABLE `tickets` (
 
 -- CreateTable
 CREATE TABLE `payments` (
-    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `id` VARCHAR(191) NOT NULL,
     `amount` DECIMAL(10, 2) NOT NULL,
-    `status` ENUM('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
+    `status` ENUM('PENDING', 'COMPLETED', 'FAILED', 'SUCCESS', 'REFUNDED') NOT NULL DEFAULT 'PENDING',
     `paymentMethod` ENUM('CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'CASH') NOT NULL,
     `transactionId` VARCHAR(191) NULL,
     `userId` INTEGER NOT NULL,
+    `signature` VARCHAR(191) NULL,
+    `transaction_code` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../axios';
+import { Link } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_IMAGE;
 
@@ -192,12 +193,12 @@ const ComingSoon = () => {
                         </span>
                       </button>
                       
-                      <button 
+                      <Link 
                         className="flex-1 bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-300"
-                        onClick={() => window.location.href = `/movies/${movie.id}`}
+                        to={ `/movies/${movie.id}`}
                       >
                         View Details
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>

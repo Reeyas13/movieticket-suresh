@@ -42,22 +42,23 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-white hover:text-amber-500 transition-colors">Home</Link>
             <Link to="/movies" className="text-white hover:text-amber-500 transition-colors">Movies</Link>
-            <a href="#" className="text-white hover:text-amber-500 transition-colors">Theaters</a>
-            <a href="#" className="text-white hover:text-amber-500 transition-colors">Promotions</a>
-            <a href="#" className="text-white hover:text-amber-500 transition-colors">About</a>
+            {/* <a href="#" className="text-white hover:text-amber-500 transition-colors">Theaters</a> */}
+            {/* <a href="#" className="text-white hover:text-amber-500 transition-colors">Promotions</a> */}
+            {/* <a href="#" className="text-white hover:text-amber-500 transition-colors">About</a> */}
           </div>
 
           {/* Desktop Auth */}
           <div className="hidden md:flex items-center gap-4">
-{console.log(currentUser)}
+{/* {console.log(currentUser)} */}
             {currentUser ? (
               <>
-                <Link to="/my-bookings" className="text-white hover:text-amber-500 transition-colors">
+                <Link to="/history" className="text-white hover:text-amber-500 transition-colors">
                   My Bookings
                 </Link>
                 <div className="relative">
-                  <Link to="/profile" className="flex items-center gap-2 text-white hover:text-amber-500 transition-colors">
-                    <span>{currentUser.name.split(' ')[0]}</span>
+                  <Link to="/my-profile" className="flex items-center gap-2 text-white hover:text-amber-500 transition-colors">
+                    <span>{currentUser && currentUser?.name.split(' ')[0]}</span>
+                    {/* {console.log(currentUser)} */}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-6 w-6 text-amber-500"

@@ -16,6 +16,7 @@ import {
   updateOrderAfterPayment,
 } from "../controllers/esewa.js";
 import testingController from '../controllers/testingController.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,8 +52,8 @@ io.on("connection", (socket) => {
   testingController.onConnection(socket, io);
 });
 
-server.listen(5000, () => {
-  console.log(`MovieTicket backend is running on http://localhost:5000`);
+server.listen(5001, () => {
+  console.log(`MovieTicket backend is running on http://localhost:5001`);
 });
 
 // Configure static file serving for uploads
@@ -69,11 +70,14 @@ app.use((req, res, next) => {
   next();
 });
 app.use("/api", router);
-app.post("/api/payment/initiate", createOrder);
+app.post("/api/payment/initiate",authMiddleware(['CINEMA', 'ADMIN', 'USER']), createOrder);
 app.get("/api/esewa/success", handleEsewaSuccess, updateOrderAfterPayment);
 app.get("/api/esewa/failure", (req, res) => {
   console.log(req.body);
-  return res.status(200).json({ success: false });
+  res.redirect(
+      "http://localhost:5173/payment-failure"
+    );
+  // return res.status(200).json({ success: false });
 });
 
 // Serve frontend in production

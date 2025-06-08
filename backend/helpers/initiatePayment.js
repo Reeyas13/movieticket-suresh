@@ -14,51 +14,39 @@ import prisma from "../prisma/prisma.js";
 export const createOrder = async (req, res) => {
   try {
     // const order = await orderService.save(req.body);
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    const { userId } = await getTokenInfo(token);
-    const { orderId } = req.body;
-
-    const order = await prisma.order.findFirst({
+    // const token = req.cookies.token;
+    // if (!token) {
+    //   return res.status(401).json({ message: "Unauthorized" });
+    // }
+    const { userId } = req.user.id
+    const { paymentId } = req.body;
+    console.log(req.user)
+    const payment = await prisma.payment.findFirst({
       where: {
-        id: parseInt(orderId),
-      },
-      include: {
-        products: true,
-        shipping: true,
+        id: paymentId,
       },
     });
 
-    const payment = await prisma.payment.create({
-      data: {
-        orderId: order.id,
-        amount: order.total,
-        userId: userId,
-      },
-    });
     const signature = createSignature(  
       `total_amount=${payment.amount},transaction_uuid=${payment.id},product_code=EPAYTEST`
     );
     console.log(signature);
-
+    console.log(payment.amount)
     const formData = {
-      amount: order.products.price * order.quantity,
-      failure_url: "http://localhost:5000/api/esewa/failure",
-      product_delivery_charge: parseInt(order.shipping.shippingFee),
+      amount: payment.amount,
+      failure_url: "http://localhost:5001/api/esewa/failure",
+      product_delivery_charge: "0",
       product_service_charge: "0",
       product_code: "EPAYTEST",
       signature: signature,
       signed_field_names: "total_amount,transaction_uuid,product_code",
-      success_url: "http://localhost:5000/api/esewa/success",
+      success_url: "http://localhost:5001/api/esewa/success",
       tax_amount: "0",
       total_amount: payment.amount,
       transaction_uuid: payment.id,
     };
     return res.json({
-      message: "Order Created Successfully",
-      order,
+      message: "payment Created Successfully",
       payment_method: "esewa",
       formData,
       success: true,
