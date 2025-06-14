@@ -143,10 +143,10 @@ async function getUserPayments(req, res) {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 10, status } = req.query;
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const whereClause = { userId, amount: 0 }; // Only fetch zero-amount payments
+    const whereClause = { userId}; // Only fetch zero-amount payments
     if (status) whereClause.status = status;
+    console.log( whereClause)
 
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({

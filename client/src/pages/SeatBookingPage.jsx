@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
 import api from '../axios';
@@ -289,39 +289,51 @@ const SeatBookingPage = () => {
     }
 
     try {
-      const bookingData = {
-        userId: user.id,
-        showtimeId: Number(showtimeid),
-        seats: selectedSeats,
-        paymentMethod,
-      };
+     const bookingData = {
+    userId: user.id,
+    showtimeId: Number(showtimeid),
+    seats: selectedSeats,
+    paymentMethod,
+  };
 
-      const response = await api.post('api/frontend/bookings', bookingData);
-      const { payment, tickets } = response.data;
-console.log({payment,tickets})
-      setBookedSeats((prev) => [...new Set([...prev, ...selectedSeats])]);
-      setSelectedSeats([]);
+  const response = await api.post('api/frontend/bookings', bookingData);
+  const { payment, tickets } = response.data;
+  console.log({payment, tickets});
 
-      selectedSeats.forEach((seatId) => {
-        if (socket) {
-          socket.emit('seat_booked', {
-            seatId,
-            showtimeId: Number(showtimeid),
-            userId: user.id,
-            status: 'BOOKED',
-          });
-        }
-      });
+  // DON'T emit seat_booked here anymore - wait for payment success
+  // Remove this block:
+  // selectedSeats.forEach((seatId) => {
+  //   if (socket) {
+  //     socket.emit('seat_booked', {
+  //       seatId,
+  //       showtimeId: Number(showtimeid),
+  //       userId: user.id,
+  //       status: 'BOOKED',
+  //     });
+  //   }
+  // });
 
-      const data ={
-         amount: payment.amount,
+  const data = {
+    amount: payment.amount,
+    paymentId: payment.id,
+  };
+
+  const responseData = await api.post("/api/payment/initiate", data);
+
+  if (responseData.data.payment_method === "esewa") {
+    // Store payment info for later use
+    const paymentInfo = {
       paymentId: payment.id,
-      }
-       const responseData = await api.post("/api/payment/initiate", data);
-      // console.log({ responseData })
-       if (responseData.data.payment_method === "esewa") {
-          esewaCall(responseData.data.formData);
-        }
+      userId: user.id,
+      showtimeId: Number(showtimeid),
+      selectedSeats: selectedSeats
+    };
+    
+    // Store in sessionStorage or component state
+    sessionStorage.setItem('pendingPayment', JSON.stringify(paymentInfo));
+    
+    esewaCall(responseData.data.formData);
+  }   
      
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -447,6 +459,11 @@ console.log({payment,tickets})
       title: `Seat ${seat.row}${seat.number} - Available (Rs. ${seat.price.toFixed(2)})`,
     };
   };
+
+  if(!isAuthenticated){
+    toast.error("login to book tickets");
+    return <Navigate to="/login" replace />
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">

@@ -1,7 +1,8 @@
+
 import { useState } from 'react';
 
 const Hero = ({ featuredMovie, onBookTickets }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [imageError, setImageError] = useState(false);
   
   // Use provided featuredMovie or fallback to default if not provided
   const movie = featuredMovie || {
@@ -12,24 +13,52 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
     releaseDate: "March 1, 2024"
   };
 
-  // Handle image parsing safely
-  let imageUrl;
-  try {
-    const imageLink = JSON.parse(movie.image)[0];
-    imageUrl = import.meta.env.VITE_API_IMAGE + imageLink;
-  } catch (error) {
-    // Fallback to movie.image if it's already a string URL
-    imageUrl = movie.image;
-  }
+  // Improved image parsing with better error handling
+  const getImageUrl = (imageData) => {
+    if (!imageData) return "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
+    
+    // If it's already a valid URL string
+    if (typeof imageData === 'string' && (imageData.startsWith('http') || imageData.startsWith('/'))) {
+      return imageData;
+    }
+    
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(imageData);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const imagePath = parsed[0];
+        // Check if we need to prepend API URL
+        // if (imagePath.startsWith('/') && typeof import !== 'undefined' && import.meta?.env?.VITE_API_IMAGE) {
+         
+        // }
+         return `${import.meta.env.VITE_API_IMAGE}${imagePath}`;
+        // return imagePath;
+      }
+    } catch (error) {
+      console.warn('Failed to parse image data:', error);
+    }
+    
+    // Fallback
+    return "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80";
+  };
+
+  const imageUrl = getImageUrl(movie.image);
+
+  const handleImageError = () => {
+    setImageError(true);
+  };
 
   return (
-    <section className="relative h-screen overflow-hidden">
-      {/* Background Image Layer */}
+    <section className="relative min-h-screen overflow-hidden">
+      {/* Background Image Layer with improved positioning */}
       <div className="absolute inset-0">
         <img 
-          src={imageUrl}
+          src={imageError ? "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80" : imageUrl}
           alt={movie.title}
-          className="w-full h-full object-cover object-center"
+          className="w-full h-full object-contain"
+          style={{ objectPosition: 'center center' }}
+          onError={handleImageError}
+          loading="eager"
         />
         {/* Multi-layer overlay for better contrast */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/40"></div>
@@ -37,8 +66,8 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-6 lg:px-8 relative h-full flex items-center">
-        <div className="max-w-3xl text-white space-y-8 z-10">
+      <div className="container mx-auto px-6 lg:px-8 relative min-h-screen flex items-center">
+        <div className="max-w-3xl text-white space-y-8 z-10 py-20">
           {/* Featured Badge and Date */}
           <div className="flex items-center space-x-4 animate-fadeInUp">
             <span className="bg-gradient-to-r from-red-600 to-red-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
@@ -50,12 +79,12 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
           </div>
           
           {/* Title */}
-          <h1 className="text-6xl lg:text-7xl font-bold leading-tight bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent animate-fadeInUp delay-100">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold leading-tight bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent animate-fadeInUp delay-100">
             {movie.title}
           </h1>
           
           {/* Rating and Meta Info */}
-          <div className="flex items-center space-x-6 text-lg animate-fadeInUp delay-200">
+          <div className="flex flex-wrap items-center gap-4 text-lg animate-fadeInUp delay-200">
             <div className="flex items-center bg-black/30 px-3 py-2 rounded-full backdrop-blur-sm">
               <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
@@ -73,19 +102,15 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
               <span className="ml-2 font-semibold text-white">{movie.rating}</span>
             </div>
             
-            <div className="h-6 w-px bg-white/30"></div>
+            <div className="h-6 w-px bg-white/30 hidden sm:block"></div>
             
             <span className="text-gray-300 bg-black/30 px-3 py-2 rounded-full backdrop-blur-sm">
               {movie.duration || "2h 46m"}
             </span>
-            
-            <div className="h-6 w-px bg-white/30"></div>
-            
-        
           </div>
           
           {/* Description */}
-          <p className="text-xl leading-relaxed text-gray-200 max-w-2xl animate-fadeInUp delay-300">
+          <p className="text-lg md:text-xl leading-relaxed text-gray-200 max-w-2xl animate-fadeInUp delay-300">
             {movie.description}
           </p>
           
@@ -130,5 +155,8 @@ const Hero = ({ featuredMovie, onBookTickets }) => {
     </section>
   );
 };
+
+// Movie Card Component for upcoming movies
+
 
 export default Hero;

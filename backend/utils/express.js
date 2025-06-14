@@ -26,7 +26,7 @@ const app = express();
 
 // middlewares
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Important for parsing form data
+app.use(express.urlencoded({ extended: true })); // Import  ant for parsing form data
 app.use(cookieParser());
 console.log(process.env.FRONTENDURL)
 app.use(
@@ -90,3 +90,4 @@ if (process.env.NODE_ENV === "production") {
 }
 
 export default app;
+export { io };

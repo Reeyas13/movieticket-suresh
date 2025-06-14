@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +12,12 @@ const PaymentSuccess = () => {
     setTransactionCode(code);
     setTransactionUUID(uuid);
   }, [searchParams]);
+  const navigate = useNavigate();
+if(transactionCode){
+  setTimeout(() => {
+    navigate(`/history/${transactionUUID}`);
+  }, 3000);
+}
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-green-50">

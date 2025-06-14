@@ -18,13 +18,7 @@ const Ticket = () => {
   const [error, setError] = useState();
   const [loading, setLoading] = useState(false);
   useEffect(() => {
-/*************  ✨ Windsurf Command ⭐  *************/
-  /**
-   * Fetches ticket details based on the uuid in the URL.
-   *
-   * If the fetch is successful, the ticket details are stored in the
-   * ticketDetails state.  If there is an error, the error message is
-   */
+
     async function fetchData() {
       try {
         setLoading(true);

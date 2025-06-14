@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Calendar, Clock, MapPin, User, Filter, Search, Eye, Download, CheckCircle, XCircle } from 'lucide-react';
 import api from '../axios';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 const PaymentList = () => {
+    const { isAuthenticated, user } = useSelector((state) => state.auth);
+
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -94,6 +97,10 @@ const PaymentList = () => {
         </div>
       </div>
     );
+  }
+  if(!isAuthenticated){
+    toast.error("login to book tickets");
+    return <Navigate to="/login" replace />
   }
 
   return (

@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { logoutapi } from '../store/slices/authSlice';
-import { useSelector } from 'react-redux';
+import { logout, logoutapi } from '../store/slices/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const currentUser = user;
-
-  const handleLogout = () => {
-    logoutapi();
+const dispatch = useDispatch();
+  const handleLogout = async() => {
+    await dispatch(logout())  
     navigate('/');
     setIsMenuOpen(false);
   };
@@ -77,7 +77,7 @@ const Navbar = () => {
                   onClick={handleLogout}
                   className="bg-gray-200 text-gray-600 px-4 py-2 rounded-md font-medium hover:bg-gray-300 transition-colors"
                 >
-                  Logout
+                  Logout fasd
                 </button>
               </>
             ) : (

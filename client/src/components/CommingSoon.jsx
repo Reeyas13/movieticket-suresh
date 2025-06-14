@@ -129,7 +129,7 @@ const ComingSoon = () => {
                     <img 
                       src={imgSrc}
                       alt={movie.title}
-                      className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-500"
+                      className="w-full h-72 object-contain group-hover:scale-110 transition-transform duration-500"
                       onError={(e) => {
                         e.target.src = "https://images.unsplash.com/photo-1535016120720-40c646be5580?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60";
                       }}

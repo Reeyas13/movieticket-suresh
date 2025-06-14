@@ -199,6 +199,7 @@ enum PaymentMethod {
   PAYPAL
   BANK_TRANSFER
   CASH
+  ESEWA
 }
 enum Roles{
   USER

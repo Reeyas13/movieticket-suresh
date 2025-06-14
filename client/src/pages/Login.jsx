@@ -40,7 +40,7 @@ const Login = () => {
       }
       localStorage.setItem('token', res.payload.token);
       toast.success(res.payload.message || 'Login successful');
-      navigate('/admin');
+      navigate('/');
     } else {
       toast.error(res?.payload?.message || 'Login failed');
     }
